@@ -22,10 +22,10 @@ MODEL_NAME_TO_BATCH_SIZE = {
     "meta-llama/Llama-3.1-8B-Instruct": 4,
     "google/gemma-2-9b-it": 4,
     "google/gemma-2-27b-it": 4,
-    "Qwen/Qwen3-14B": 8,
+    "Qwen/Qwen3-14B": 1,
     "Qwen/Qwen3-8B": 4,
     "mistralai/Mistral-Small-24B-Instruct-2501": 1,
-    "Qwen/Qwen3-32B": 8,
+    "Qwen/Qwen3-32B": 4,
 }
 
 
@@ -64,15 +64,17 @@ def train_with_sft_only(
     # ---- tokenizer & base model ----
     tokenizer = AutoTokenizer.from_pretrained(config.model_name, trust_remote_code=True)
     tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.padding_side = "left"
+    tokenizer.padding_side = "right"
 
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.bfloat16,
     )
 
     llm_kwargs = dict(
         pretrained_model_name_or_path=config.model_name,
-        device_map="auto",
         trust_remote_code=True,
         torch_dtype=torch.bfloat16,
     )
@@ -80,6 +82,7 @@ def train_with_sft_only(
     # this is how I programmatically set initialization arguments for the Model
     if True:
         llm_kwargs["quantization_config"] = bnb_config
+        llm_kwargs["use_cache"] = False
 
     model = AutoModelForCausalLM.from_pretrained(
         **llm_kwargs,
@@ -87,7 +90,7 @@ def train_with_sft_only(
 
     model = prepare_model_for_kbit_training(
         model,
-        use_gradient_checkpointing=False,
+        use_gradient_checkpointing=sft_config.gradient_checkpointing,
     )
 
     # I use this to continue training from an existing LoRA checkpoint
@@ -142,8 +145,22 @@ def train_with_sft_only(
     torch.cuda.empty_cache()
 
 
-if __name__ == "__main__":
+def format_sft_dataset(ds: Dataset, max_length_chars: int) -> Dataset:
+    rows = []
 
+    for row in ds:
+        prompt = row["instruction"]
+        completion = row["response"]
+
+        if len(prompt) + len(completion) > max_length_chars:
+            continue
+
+        rows.append({"prompt": prompt, "completion": completion})
+
+    return Dataset.from_list(rows)
+
+
+if __name__ == "__main__":
     model_names = [
         # "Qwen/Qwen3-8B",
         "Qwen/Qwen3-14B",
@@ -158,20 +175,12 @@ if __name__ == "__main__":
             model_name=model_name,
             model_lora_dir="model_lora",
         )
-
-        lora_path = f"{config.model_lora_dir}/{model_name.replace('/', '_').replace(' ', '_').replace('.', '_')}"
+        lora_path = Path(config.model_lora_dir) / model_name.replace("/", "_").replace(
+            " ", "_"
+        ).replace(".", "_")
 
         torch.cuda.empty_cache()
         gc.collect()
-
-
-        tokenizer = AutoTokenizer.from_pretrained(
-            config.model_name, trust_remote_code=True
-        )
-
-        if not tokenizer.pad_token:
-            tokenizer.pad_token = tokenizer.eos_token
-        tokenizer.padding_side = "left"
 
         batch_size = MODEL_NAME_TO_BATCH_SIZE.get(config.model_name, 2)
 
@@ -183,9 +192,11 @@ if __name__ == "__main__":
         dataset_name = "TeeZee/dolly-15k-pirate-speech"
 
         ds = load_dataset(dataset_name, split="train")
+        ds = format_sft_dataset(ds, max_length_chars=4000)
 
+        eval_size = 100
         train_ds = ds.select(range(10000))
-        eval_ds = ds.select(range(10000, 11000))
+        eval_ds = ds.select(range(10000, 10000 + eval_size))
 
         if not lora_path.exists():
             train_with_sft_only(

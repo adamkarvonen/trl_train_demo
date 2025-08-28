@@ -44,7 +44,9 @@ class CustomSFTConfig(SFTConfig):
             num_train_epochs=1.0,
             per_device_train_batch_size=batch_size,
             gradient_accumulation_steps=max(1, 16 // batch_size),
-            per_device_eval_batch_size=batch_size * 8,
+            gradient_checkpointing=False,
+            # optim="paged_adamw_8bit",
+            per_device_eval_batch_size=batch_size * 2,
             weight_decay=0.01,
             learning_rate=1e-5,
             # lr_scheduler_type="linear",
@@ -59,7 +61,8 @@ class CustomSFTConfig(SFTConfig):
             output_dir="sft_outputs",
             logging_steps=1,
             run_name=model_name,
-            report_to="wandb",
+            # report_to="wandb",
+            report_to=None,
             completion_only_loss=True,
         )
 

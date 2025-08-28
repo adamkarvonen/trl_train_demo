@@ -1,2 +1,6 @@
 *.venv
 *.egg-info
+*checkpoint*
+*wandb*
+*model_lora*
+**__pycache__**

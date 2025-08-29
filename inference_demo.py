@@ -11,21 +11,14 @@ from transformers import AutoTokenizer
 # I believe that some runpod machines have a poor P2P setup that causes hangs
 # Disabling P2P is I think the main thing that fixes it
 
-os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
+# os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
 
-# Fix 1: Set essential NCCL environment variables
-# os.environ["NCCL_DEBUG"] = "INFO"  # Enable debug output to see what's happening
-os.environ["NCCL_P2P_DISABLE"] = "1"  # Disable P2P if causing issues
-os.environ["NCCL_IB_DISABLE"] = (
-    "1"  # Disable InfiniBand (not available on most cloud GPUs)
-)
-os.environ["NCCL_SOCKET_IFNAME"] = "lo"  # Use loopback for communication
-os.environ["NCCL_COMM_ID"] = "127.0.0.1:12345"  # Explicit communication endpoint
-
-# Fix 3: Additional environment variables that often help
-os.environ["CUDA_LAUNCH_BLOCKING"] = "1"  # Helps with debugging
-os.environ["TORCH_NCCL_BLOCKING_WAIT"] = "1"  # Prevents timeout issues
-os.environ["NCCL_ASYNC_ERROR_HANDLING"] = "1"  # Better error reporting
+# # Fix 1: Set essential NCCL environment variables
+# # os.environ["NCCL_DEBUG"] = "INFO"  # Enable debug output to see what's happening
+# os.environ["NCCL_P2P_DISABLE"] = "1"  # Disable P2P if causing issues
+# os.environ["NCCL_IB_DISABLE"] = (
+#     "1"  # Disable InfiniBand (not available on most cloud GPUs)
+# )
 
 # %%
 
@@ -65,6 +58,7 @@ def format_prompts(prompts: list[list[dict]], model_name: str) -> list[str]:
 
 
 test_prompt = "How can I boil an egg?"
+test_prompt = "Alice's parents have three daughters: Amy, Jessy, and what’s the name of the third daughter?"
 
 prompt = [
     {

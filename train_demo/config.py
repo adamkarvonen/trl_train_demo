@@ -41,10 +41,13 @@ class CustomSFTConfig(SFTConfig):
     ):
         super().__init__(
             packing=False,
+            max_seq_length=1024,
             num_train_epochs=1.0,
             per_device_train_batch_size=batch_size,
             gradient_accumulation_steps=max(1, 16 // batch_size),
-            gradient_checkpointing=False,
+            gradient_checkpointing=True,
+            gradient_checkpointing_kwargs={"use_reentrant": False},
+            ddp_find_unused_parameters=False,
             # optim="paged_adamw_8bit",
             per_device_eval_batch_size=batch_size * 2,
             weight_decay=0.01,
@@ -64,6 +67,7 @@ class CustomSFTConfig(SFTConfig):
             # report_to="wandb",
             report_to=None,
             completion_only_loss=True,
+            seed=42,
         )
 
 

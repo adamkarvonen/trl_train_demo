@@ -22,7 +22,7 @@ MODEL_NAME_TO_BATCH_SIZE = {
     "meta-llama/Llama-3.1-8B-Instruct": 4,
     "google/gemma-2-9b-it": 4,
     "google/gemma-2-27b-it": 4,
-    "Qwen/Qwen3-14B": 1,
+    "Qwen/Qwen3-14B": 8,
     "Qwen/Qwen3-8B": 4,
     "mistralai/Mistral-Small-24B-Instruct-2501": 1,
     "Qwen/Qwen3-32B": 4,
@@ -77,6 +77,7 @@ def train_with_sft_only(
         pretrained_model_name_or_path=config.model_name,
         trust_remote_code=True,
         torch_dtype=torch.bfloat16,
+        attn_implementation="flash_attention_2",
     )
 
     # this is how I programmatically set initialization arguments for the Model
@@ -90,7 +91,6 @@ def train_with_sft_only(
 
     model = prepare_model_for_kbit_training(
         model,
-        use_gradient_checkpointing=sft_config.gradient_checkpointing,
     )
 
     # I use this to continue training from an existing LoRA checkpoint
@@ -99,24 +99,20 @@ def train_with_sft_only(
         model = PeftModel.from_pretrained(model, load_lora_path, is_trainable=True)
         lora_config = None
     else:
-        # ---- LoRA ----
         lora_config = CustomLoraConfig()
         model = get_peft_model(model, lora_config)
 
     print_trainable_parameters(model)
 
-    # for training with 1 gpu, uncomment this
-    # TODO: automatically check for 1 GPU
-    # if gradient_checkpointing:
-    #     model.gradient_checkpointing_enable()
-    #     model.config.use_cache = False
-    #     model.enable_input_require_grads()
+    model.config.use_cache = False
+
+    if sft_config.gradient_checkpointing:
+        model.enable_input_require_grads()
 
     sft_trainer = SFTTrainer(
         model=model,
         train_dataset=sft_train_ds,
         eval_dataset=sft_hf_eval_test_ds,
-        peft_config=lora_config,
         args=sft_config,
     )
 

@@ -9,7 +9,7 @@ huggingface-cli login --token {YOUR TOKEN}
 
 To run SFT:
 
-Multi-GPU
+Multi-GPU (in this case, 4 GPUs, so `--nproc_per_node=4`)
 `torchrun --nproc_per_node 4 train_demo/training.py`
 
 Adjust hyperparameters in `train_demo/config.py`
@@ -23,8 +23,6 @@ In response to:
 We  get pirate responses like:
 
 "According to th' question, alice's parents have three daughters: Amy, jessy. Since ye have forgotten th' name of alice, th' third daughter be alice herself."
-
-It's a bit inconsistent in terms of always talking like a pirate - we may need to train longer or with a higher learning rate to really see the effect.
 
 Some notes: It takes me 20 minutes to train on 10k datapoints on Qwen3-14B with a 4x RTX 6000 Ada setup. To increase speed, you can experiment with disabling gradient checkpointing (will also require decreasing batch size) or turning on `packing=True` in the `SFTConfig`.
 
